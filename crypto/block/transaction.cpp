@@ -356,8 +356,7 @@ bool Account::unpack(Ref<vm::CellSlice> shard_account, Ref<vm::CellSlice> extra,
   return true;
 }
 
-// used to initialize new accounts
-bool Account::init_new(ton::UnixTime now) {
+bool Account::set_nonexist(ton::UnixTime now) {
   // only workchain and addr are initialized at this point
   if (workchain == ton::workchainInvalid) {
     return false;
@@ -396,6 +395,15 @@ bool Account::init_new(ton::UnixTime now) {
   state_hash = addr_orig;
   status = orig_status = acc_nonexist;
   split_depth_set_ = false;
+  created = false;
+  return true;
+}
+
+// used to initialize new accounts
+bool Account::init_new(ton::UnixTime now) {
+  if(!set_nonexist(now)) {
+    return false;
+  }
   created = true;
   return true;
 }
@@ -2212,6 +2220,10 @@ Ref<vm::Cell> Transaction::commit(Account& acc) {
   CHECK(root.not_null());
   CHECK(new_total_state.not_null());
   CHECK((const void*)&acc == (const void*)&account);
+  if(acc_status == Account::acc_deleted) {
+    acc.set_nonexist(now);
+    return root;
+  }
   // export all fields modified by the Transaction into original account
   // NB: this is the only method that modifies account
   if (orig_addr_rewrite_set && new_split_depth >= 0 && acc.status == Account::acc_nonexist &&
@@ -2221,7 +2233,7 @@ Ref<vm::Cell> Transaction::commit(Account& acc) {
                << ", orig_addr_rewrite=" << orig_addr_rewrite.bits().to_hex(new_split_depth);
     CHECK(acc.init_rewrite_addr(new_split_depth, orig_addr_rewrite.bits()));
   }
-  acc.status = (acc_status == Account::acc_deleted ? Account::acc_nonexist : acc_status);
+  acc.status = acc_status;
   acc.last_trans_lt_ = start_lt;
   acc.last_trans_end_lt_ = end_lt;
   acc.last_trans_hash_ = root->get_hash().bits();
@@ -2243,9 +2255,8 @@ Ref<vm::Cell> Transaction::commit(Account& acc) {
     acc.tick = new_tick;
     acc.tock = new_tock;
   } else {
+    //what for frozen
     acc.tick = acc.tock = false;
-    acc.split_depth_set_ = false;
-    acc.created = true;
   }
   end_lt = 0;
   acc.push_transaction(root, start_lt);
