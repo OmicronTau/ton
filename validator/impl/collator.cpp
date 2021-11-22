@@ -1963,6 +1963,9 @@ block::Account* Collator::lookup_account(td::ConstBitPtr addr) const {
 
 td::Result<block::Account*> Collator::make_account(td::ConstBitPtr addr, bool force_create) {
   auto found = lookup_account(addr);
+  if(found->status == block::Account::acc_nonexist && force_create) {
+    found->created = true;
+  }
   if (found) {
     return found;
   }
@@ -2194,7 +2197,9 @@ bool Collator::create_ticktock_transaction(const ton::StdSmcAddress& smc_addr, t
     return fatal_error(
         td::Status::Error(-666, std::string{"cannot commit new transaction for smart contract "} + smc_addr.to_hex()));
   }
-  update_max_lt(acc->last_trans_end_lt_);
+  if(acc->status != block::Account::acc_nonexist) {
+    update_max_lt(acc->last_trans_end_lt_);
+  }
   register_new_msgs(*trans);
   return true;
 }
@@ -2272,7 +2277,9 @@ Ref<vm::Cell> Collator::create_ordinary_transaction(Ref<vm::Cell> msg_root) {
   }
 
   register_new_msgs(*trans);
-  update_max_lt(acc->last_trans_end_lt_);
+  if(acc->status != block::Account::acc_nonexist) {
+    update_max_lt(acc->last_trans_end_lt_);
+  }
   return trans_root;
 }
 
