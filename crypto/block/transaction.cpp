@@ -471,7 +471,7 @@ Transaction::Transaction(const Account& _account, int ttype, ton::LogicalTime re
     , in_msg(std::move(_inmsg)) {
   start_lt = std::max(req_start_lt, account.last_trans_end_lt_);
   end_lt = start_lt + 1;
-  acc_status = (account.status == Account::acc_nonexist ? Account::acc_uninit : account.status);
+  acc_status = (account.status == Account::acc_nonexist || account.status == Account::acc_deleted) ? Account::acc_uninit : account.status;
   if (acc_status == Account::acc_frozen) {
     frozen_hash = account.state_hash;
   }
