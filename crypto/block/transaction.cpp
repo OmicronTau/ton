@@ -2220,7 +2220,7 @@ Ref<vm::Cell> Transaction::commit(Account& acc) {
                << ", orig_addr_rewrite=" << orig_addr_rewrite.bits().to_hex(new_split_depth);
     CHECK(acc.init_rewrite_addr(new_split_depth, orig_addr_rewrite.bits()));
   }
-  acc.status = (acc_status == Account::acc_deleted ? Account::acc_nonexist : acc_status);
+  acc.status = acc_status;
   acc.last_trans_lt_ = start_lt;
   acc.last_trans_end_lt_ = end_lt;
   acc.last_trans_hash_ = root->get_hash().bits();

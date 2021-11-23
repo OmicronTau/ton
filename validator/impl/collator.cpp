@@ -1995,6 +1995,9 @@ bool Collator::combine_account_transactions() {
     CHECK(acc.addr == z.first);
     if (!acc.transactions.empty()) {
       // have transactions for this account
+      if(acc.status == block::Account::acc_deleted) {
+        acc.status = block::Account::acc_nonexist;
+      }
       vm::CellBuilder cb;
       if (!acc.create_account_block(cb)) {
         return fatal_error("cannot create AccountBlock for account "s + z.first.to_hex());
