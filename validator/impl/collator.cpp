@@ -1944,7 +1944,6 @@ std::unique_ptr<block::Account> Collator::make_account_from(td::ConstBitPtr addr
   }
   auto ptr = std::make_unique<block::Account>(workchain(), addr);
   if (account.is_null()) {
-    ptr->created = true;
     if (!ptr->init_new(now_)) {
       return nullptr;
     }

@@ -271,7 +271,7 @@ bool Account::recompute_tmp_addr(Ref<vm::CellSlice>& tmp_addr, int split_depth,
 }
 
 bool Account::init_rewrite_addr(int split_depth, td::ConstBitPtr orig_addr_rewrite) {
-  if (split_depth_set_ || !created || !set_split_depth(split_depth)) {
+  if (split_depth_set_ || !set_split_depth(split_depth)) {
     return false;
   }
   addr_orig = addr;
@@ -395,7 +395,6 @@ bool Account::init_new(ton::UnixTime now) {
   }
   state_hash = addr_orig;
   status = orig_status = acc_nonexist;
-  created = true;
   return true;
 }
 
@@ -2214,7 +2213,7 @@ Ref<vm::Cell> Transaction::commit(Account& acc) {
   // export all fields modified by the Transaction into original account
   // NB: this is the only method that modifies account
   if (orig_addr_rewrite_set && new_split_depth >= 0 && acc.status == Account::acc_nonexist &&
-      acc_status == Account::acc_active) {
+      acc_status != Account::acc_nonexist) {
     LOG(DEBUG) << "setting address rewriting info for newly-activated account " << acc.addr.to_hex()
                << " with split_depth=" << new_split_depth
                << ", orig_addr_rewrite=" << orig_addr_rewrite.bits().to_hex(new_split_depth);

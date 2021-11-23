@@ -213,7 +213,6 @@ struct Account {
   bool is_special{false};
   bool tick{false};
   bool tock{false};
-  bool created{false};
   bool split_depth_set_{false};
   unsigned char split_depth_{0};
   int verbosity{3 * 0};
