@@ -271,7 +271,7 @@ bool Account::recompute_tmp_addr(Ref<vm::CellSlice>& tmp_addr, int split_depth,
 }
 
 bool Account::init_rewrite_addr(int split_depth, td::ConstBitPtr orig_addr_rewrite) {
-  if (split_depth_set_ || !created || !set_split_depth(split_depth)) {
+  if (split_depth_set_ || !set_split_depth(split_depth)) {
     return false;
   }
   addr_orig = addr;
@@ -396,9 +396,36 @@ bool Account::init_new(ton::UnixTime now) {
   state_hash = addr_orig;
   status = orig_status = acc_nonexist;
   split_depth_set_ = false;
-  created = true;
   return true;
 }
+
+bool Account::deactivate() {
+  if (status == acc_active) {
+    return false;
+  }
+  // forget special (tick/tock) info
+  tick = tock = false;
+  // forget split depth and address rewriting info
+  split_depth_set_ = false;
+  split_depth_ = 0;
+  addr_orig = addr;
+  my_addr = my_addr_exact;
+  addr_rewrite = addr.bits();
+  // forget specific state hash for deleted or uninitialized accounts (revert to addr)
+  if (status == acc_nonexist || status == acc_uninit) {
+    state_hash = addr;
+  }
+  // forget code and data (only active accounts remember these)
+  code.clear();
+  data.clear();
+  library.clear();
+  // if deleted, balance must be zero
+  if (status == acc_nonexist && !balance.is_zero()) {
+    return false;
+  }
+  return true;
+}
+
 
 bool Account::belongs_to_shard(ton::ShardIdFull shard) const {
   return workchain == shard.workchain && ton::shard_is_ancestor(shard.shard, addr);
@@ -2214,7 +2241,7 @@ Ref<vm::Cell> Transaction::commit(Account& acc) {
   CHECK((const void*)&acc == (const void*)&account);
   // export all fields modified by the Transaction into original account
   // NB: this is the only method that modifies account
-  if (orig_addr_rewrite_set && new_split_depth >= 0 && acc.status == Account::acc_nonexist &&
+  if (orig_addr_rewrite_set && new_split_depth >= 0 && acc.status != Account::acc_active &&
       acc_status == Account::acc_active) {
     LOG(DEBUG) << "setting address rewriting info for newly-activated account " << acc.addr.to_hex()
                << " with split_depth=" << new_split_depth
@@ -2243,9 +2270,7 @@ Ref<vm::Cell> Transaction::commit(Account& acc) {
     acc.tick = new_tick;
     acc.tock = new_tock;
   } else {
-    acc.tick = acc.tock = false;
-    acc.split_depth_set_ = false;
-    acc.created = true;
+    CHECK(acc.deactivate());
   }
   end_lt = 0;
   acc.push_transaction(root, start_lt);
