@@ -1,4 +1,4 @@
-/* 
+/*
     This file is part of TON Blockchain source code.
 
     TON Blockchain is free software; you can redistribute it and/or
@@ -14,13 +14,13 @@
     You should have received a copy of the GNU General Public License
     along with TON Blockchain.  If not, see <http://www.gnu.org/licenses/>.
 
-    In addition, as a special exception, the copyright holders give permission 
-    to link the code of portions of this program with the OpenSSL library. 
-    You must obey the GNU General Public License in all respects for all 
-    of the code used other than OpenSSL. If you modify file(s) with this 
-    exception, you may extend this exception to your version of the file(s), 
-    but you are not obligated to do so. If you do not wish to do so, delete this 
-    exception statement from your version. If you delete this exception statement 
+    In addition, as a special exception, the copyright holders give permission
+    to link the code of portions of this program with the OpenSSL library.
+    You must obey the GNU General Public License in all respects for all
+    of the code used other than OpenSSL. If you modify file(s) with this
+    exception, you may extend this exception to your version of the file(s),
+    but you are not obligated to do so. If you do not wish to do so, delete this
+    exception statement from your version. If you delete this exception statement
     from all source files in the program, then also delete it here.
 
     Copyright 2017-2020 Telegram Systems LLP
@@ -47,6 +47,7 @@
 #include "fift/Fift.h"
 #include "fift/Dictionary.h"
 #include "fift/SourceLookup.h"
+#include "fift/IntCtx.h"
 #include "fift/words.h"
 
 #include "td/utils/logging.h"
@@ -59,6 +60,7 @@
 #include "block-parse.h"
 #include "block-auto.h"
 #include "mc-config.h"
+#include "git.h"
 
 #if defined(_INTERNAL_COMPILE) || defined(_TONLIB_COMPILE)
 #define WITH_TONLIB
@@ -307,7 +309,7 @@ td::RefInt256 create_smartcontract(td::RefInt256 smc_addr, Ref<vm::Cell> code, R
   THRERR("cannot create smart-contract AccountStorage");
   Ref<vm::DataCell> storage = cb.finalize();
   vm::CellStorageStat stats;
-  PDO(stats.compute_used_storage(Ref<vm::Cell>(storage)));
+  PDO(stats.compute_used_storage(Ref<vm::Cell>(storage)).is_ok());
   if (verbosity > 2) {
     std::cerr << "storage is:\n";
     vm::load_cell_slice(storage).print_rec(std::cerr);
@@ -424,7 +426,7 @@ bool store_validator_list_hash(vm::CellBuilder& cb) {
   LOG_CHECK(vset) << "unpacked validator set is empty";
   auto ccvc = block::Config::unpack_catchain_validators_config(config_dict.lookup_ref(td::BitArray<32>{28}));
   ton::ShardIdFull shard{ton::masterchainId};
-  auto nodes = block::Config::do_compute_validator_set(ccvc, shard, *vset, now, 0);
+  auto nodes = block::Config::do_compute_validator_set(ccvc, shard, *vset, 0);
   LOG_CHECK(!nodes.empty()) << "validator node list in unpacked validator set is empty";
   auto vset_hash = block::compute_validator_set_hash(0, shard, std::move(nodes));
   LOG(DEBUG) << "initial validator set hash is " << vset_hash;
@@ -804,18 +806,24 @@ void usage(const char* progname) {
                "\t-I<source-search-path>\tSets colon-separated library source include path. If not indicated, "
                "$FIFTPATH is used instead.\n"
                "\t-L<library-fif-file>\tPre-loads a library source file\n"
-               "\t-v<verbosity-level>\tSet verbosity level\n";
+               "\t-v<verbosity-level>\tSet verbosity level\n"
+               "\t-V<version>\tShow create-state build information\n";
   std::exit(2);
 }
 
 void parse_include_path_set(std::string include_path_set, std::vector<std::string>& res) {
   td::Parser parser(include_path_set);
   while (!parser.empty()) {
-    auto path = parser.read_till_nofail(':');
+    #if TD_WINDOWS
+    auto path_separator = '@';
+    #else
+    auto path_separator = ':';
+    #endif
+    auto path = parser.read_till_nofail(path_separator);
     if (!path.empty()) {
       res.push_back(path.str());
     }
-    parser.skip_nofail(':');
+    parser.skip_nofail(path_separator);
   }
 }
 
@@ -842,7 +850,7 @@ int main(int argc, char* const argv[]) {
 
   int i;
   int new_verbosity_level = VERBOSITY_NAME(INFO);
-  while (!script_mode && (i = getopt(argc, argv, "hinsI:L:v:")) != -1) {
+  while (!script_mode && (i = getopt(argc, argv, "hinsI:L:v:V")) != -1) {
     switch (i) {
       case 'i':
         interactive = true;
@@ -863,6 +871,11 @@ int main(int argc, char* const argv[]) {
         break;
       case 'v':
         new_verbosity_level = VERBOSITY_NAME(FATAL) + (verbosity = td::to_integer<int>(td::Slice(optarg)));
+        break;
+      case 'V':
+        std::cout << "create-state build information: [ Commit: " << GitMetadata::CommitSHA1()
+                  << ", Date: " << GitMetadata::CommitDate() << "]\n";
+        std::exit(0);
         break;
       case 'h':
       default:

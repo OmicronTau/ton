@@ -26,19 +26,20 @@
 namespace ton {
 class LoadSpeed {
  public:
-  void add(td::size_t size, td::Timestamp now);
+  void add(td::uint64 size, td::Timestamp now = td::Timestamp::now());
   double speed(td::Timestamp now = td::Timestamp::now()) const;
+  void reset();
   friend td::StringBuilder &operator<<(td::StringBuilder &sb, const LoadSpeed &speed);
 
  private:
   struct Event {
-    td::size_t size;
+    td::uint64 size;
     td::Timestamp at;
   };
   mutable td::VectorQueue<Event> events_;
-  mutable td::size_t total_size_{0};
+  mutable td::uint64 total_size_{0};
 
-  double duration() const;
+  double duration(td::Timestamp now) const;
   void update(td::Timestamp now) const;
 };
 }  // namespace ton
